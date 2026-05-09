@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>凡人修仙傳 - 線上閱讀</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: "PingFang TC", "Microsoft JhengHei", "Heiti TC", sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            line-height: 1.8;
+            padding-bottom: 70px;
+        }
+        .container { max-width: 800px; margin: 0 auto; padding: 15px; }
+
+        /* Header */
+        .header {
+            position: sticky;
+            top: 0;
+            background: #16213e;
+            padding: 12px;
+            border-bottom: 2px solid #0f3460;
+            z-index: 100;
+        }
+        .header-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .header h1 { font-size: 1.1em; color: #e94560; min-width: 120px; }
+        .nav-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+        .nav-controls button, .nav-controls select {
+            padding: 6px 12px;
+            background: #0f3460;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+        }
+        .nav-controls button:hover { background: #e94560; }
+        .nav-controls select { background: #1a1a2e; border: 1px solid #0f3460; padding: 6px; max-width: 200px; }
+
+        .font-controls { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+        .font-controls span { font-size: 12px; color: #aaa; }
+        .font-controls button {
+            padding: 4px 10px;
+            background: #0f3460;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .font-controls button:hover { background: #e94560; }
+        #currentSize { color: #e94560; min-width: 40px; text-align: center; }
+
+        .progress-bar { width: 100%; height: 3px; background: #0f3460; margin-top: 8px; }
+        .progress-fill { height: 100%; background: #e94560; transition: width 0.3s; }
+
+        /* Content */
+        .content { background: #16213e; padding: 20px; border-radius: 10px; margin-top: 15px; }
+        .chapter-title {
+            color: #e94560;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            text-align: center;
+            border-bottom: 1px solid #0f3460;
+            padding-bottom: 10px;
+        }
+        .chapter-body { text-align: justify; }
+        .loading { text-align: center; color: #e94560; padding: 40px; }
+        .error { text-align: center; color: #ff6b6b; padding: 40px; }
+
+        /* Bottom nav */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #16213e;
+            border-top: 2px solid #0f3460;
+            padding: 8px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+        .bottom-nav button {
+            padding: 8px 16px;
+            background: #0f3460;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .bottom-nav button:hover { background: #e94560; }
+        .bottom-nav .chapter-info { color: #aaa; font-size: 12px; }
+
+        @media (max-width: 600px) {
+            .container { padding: 10px; }
+            .content { padding: 15px; }
+            .bottom-nav { padding: 6px 10px; }
+            .nav-controls select { max-width: 140px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-top">
+                <h1>凡人修仙傳</h1>
+                <div class="nav-controls">
+                    <button onclick="prevChapter()">◀</button>
+                    <select id="chapterSelect" onchange="jumpToChapter()">
+                        <option value="">載入中...</option>
+                    </select>
+                    <button onclick="nextChapter()">▶</button>
+                </div>
+            </div>
+            <div class="font-controls">
+                <span>字體：</span>
+                <button onclick="adjustFontSize(-2)">A-</button>
+                <span id="currentSize">18px</span>
+                <button onclick="adjustFontSize(2)">A+</button>
+                <button onclick="resetFontSize()" style="margin-left:5px;font-size:11px;">重置</button>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" id="progressBar"></div></div>
+        </div>
+
+        <div class="content" id="content">
+            <div class="loading">正在載入章節列表...</div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <button onclick="prevChapter()">◀ 上一章</button>
+        <span class="chapter-info" id="chapterInfo">-- / --</span>
+        <button onclick="nextChapter()">下一章 ▶</button>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        const START_CH = 879;
+        const END_CH = 2446;
+
+        let currentChapter = START_CH;
+        let currentFontSize = 18;
+        let chapterList = []; // {num, title}
+
+        // Font size
+        function adjustFontSize(delta) {
+            currentFontSize = Math.max(12, Math.min(32, currentFontSize + delta));
+            applyFontSize();
+            localStorage.setItem('fanren_font_size', currentFontSize);
+        }
+        function resetFontSize() {
+            currentFontSize = 18;
+            applyFontSize();
+            localStorage.setItem('fanren_font_size', currentFontSize);
+        }
+        function applyFontSize() {
+            document.getElementById('currentSize').textContent = currentFontSize + 'px';
+            const body = document.querySelector('.chapter-body');
+            if (body) body.style.fontSize = currentFontSize + 'px';
+        }
+
+        // Load chapter list
+        async function loadChapterList() {
+            try {
+                const res = await fetch(`${API_BASE}/api/chapters`);
+                const data = await res.json();
+                if (data.success) {
+                    // We need titles - fetch first chapter to get structure
+                    // Actually let's just build the select with numbers, titles come when we load
+                    const select = document.getElementById('chapterSelect');
+                    select.innerHTML = '';
+                    for (let i = 0; i < chapterList.length; i++) {
+                        const opt = document.createElement('option');
+                        opt.value = i;
+                        opt.textContent = chapterList[i].title || `第${chapterList[i].num}章`;
+                        select.appendChild(opt);
+                    }
+                    return;
+                }
+            } catch(e) {}
+            
+            // Fallback: just use chapter numbers
+            const select = document.getElementById('chapterSelect');
+            select.innerHTML = '';
+            for (let ch = START_CH; ch <= END_CH; ch++) {
+                const opt = document.createElement('option');
+                opt.value = ch - START_CH;
+                opt.textContent = `第${ch}章`;
+                opt.dataset.num = ch;
+                select.appendChild(opt);
+            }
+        }
+
+        // Fetch chapter from API
+        async function fetchChapter(chNum) {
+            const content = document.getElementById('content');
+            content.innerHTML = '<div class="loading">載入中...</div>';
+
+            try {
+                const res = await fetch(`${API_BASE}/api/chapter/${chNum}`);
+                const data = await res.json();
+                if (data.success && data.chapter) {
+                    displayChapterData(chNum, data.chapter);
+                } else {
+                    content.innerHTML = '<div class="error">章節載入失敗</div>';
+                }
+            } catch(e) {
+                content.innerHTML = '<div class="error">網路錯誤，請檢查連線</div>';
+            }
+        }
+
+        function displayChapterData(chNum, chapter) {
+            const content = document.getElementById('content');
+            const select = document.getElementById('chapterSelect');
+            const progress = document.getElementById('progressBar');
+            const info = document.getElementById('chapterInfo');
+
+            content.innerHTML = 
+                '<div class="chapter-title">' + chapter.title + '</div>' +
+                '<div class="chapter-body" style="font-size:' + currentFontSize + 'px; white-space:pre-wrap; line-height:2;">' + chapter.body + '</div>';
+
+            // Update select - find the right option
+            for (let i = 0; i < select.options.length; i++) {
+                if (select.options[i].value == chNum || select.options[i].dataset.num == chNum) {
+                    select.selectedIndex = i;
+                    break;
+                }
+            }
+
+            const idx = chNum - START_CH;
+            progress.style.width = ((idx + 1) / (END_CH - START_CH + 1) * 100) + '%';
+            info.textContent = (idx + 1) + ' / ' + (END_CH - START_CH + 1);
+
+            localStorage.setItem('fanren_chapter', chNum);
+            currentChapter = chNum;
+            window.scrollTo(0, 0);
+        }
+
+        function jumpToChapter() {
+            const select = document.getElementById('chapterSelect');
+            const idx = parseInt(select.value);
+            const chNum = START_CH + idx;
+            fetchChapter(chNum);
+        }
+
+        function prevChapter() {
+            if (currentChapter > START_CH) {
+                fetchChapter(currentChapter - 1);
+            }
+        }
+
+        function nextChapter() {
+            if (currentChapter < END_CH) {
+                fetchChapter(currentChapter + 1);
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'PageUp') prevChapter();
+            if (e.key === 'ArrowRight' || e.key === 'PageDown') nextChapter();
+        });
+
+        // Init
+        async function init() {
+            // Load saved position and font size
+            const saved = localStorage.getItem('fanren_chapter');
+            const savedFont = localStorage.getItem('fanren_font_size');
+            if (savedFont) {
+                currentFontSize = parseInt(savedFont);
+                applyFontSize();
+            }
+            if (saved) {
+                currentChapter = parseInt(saved);
+            }
+
+            // Build chapter select
+            const select = document.getElementById('chapterSelect');
+            select.innerHTML = '';
+            for (let ch = START_CH; ch <= END_CH; ch++) {
+                const opt = document.createElement('option');
+                opt.value = ch - START_CH;
+                opt.textContent = `第${ch}章`;
+                opt.dataset.num = ch;
+                select.appendChild(opt);
+            }
+
+            // Load current chapter
+            fetchChapter(currentChapter);
+        }
+
+        init();
+    </script>
+</body>
+</html>

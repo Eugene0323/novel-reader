@@ -1,0 +1,13 @@
+{
+  "name": "fanren-reader",
+  "version": "1.0.0",
+  "description": "凡人修仙傳 小說閱讀器",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "opencc": "^1.1.3"
+  }
+}
